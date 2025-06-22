@@ -1,11 +1,11 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-class SEBlock(nn.Module):
-    def __init__(self, c, redn=16):
+class seblock(nn.Module):
+    def __init__(self, c, r=16):
         super().__init__()
         self.squeeze = nn.AdaptiveAvgPool2d(1)
-        self.excitation = nn.Sequential(nn.Linear(c, c // redn),nn.ReLU(inplace=True),nn.Linear(c // redn, c),nn.Sigmoid())
+        self.excitation = nn.Sequential(nn.Linear(c, c // r),nn.ReLU(inplace=True),nn.Linear(c // r, c),nn.Sigmoid())
 
     def forward(self, x):
         b, c, _, _ = x.size()
@@ -13,20 +13,20 @@ class SEBlock(nn.Module):
         weights = self.excitation(weights).view(b, c, 1, 1)
         return x * weights.expand_as(x)
 
-class SEBasicBlock(nn.Module):
+class sebasicblock(nn.Module):
     exp = 1
 
-    def __init__(self, in_planes, planes, stride=1, redn=16):
+    def __init__(self, inpl, pl, stride=1, r=16):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_planes, planes, 3, stride, 1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, 3, 1, 1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.se = SEBlock(planes, redn)
+        self.conv1 = nn.Conv2d(inpl, pl, 3, stride, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(pl)
+        self.conv2 = nn.Conv2d(pl, pl, 3, 1, 1, bias=False)
+        self.bn2 = nn.BatchNorm2d(pl)
+        self.se = seblock(pl, r)
 
         self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != self.exp*planes:
-            self.shortcut = nn.Sequential(nn.Conv2d(in_planes, self.exp*planes,kernel_size=1, stride=stride, bias=False),nn.BatchNorm2d(self.exp*planes))
+        if stride != 1 or inpl != self.exp*pl:
+            self.shortcut = nn.Sequential(nn.Conv2d(inpl, self.exp*pl,kernel_size=1, stride=stride, bias=False),nn.BatchNorm2d(self.exp*pl))
 
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
@@ -35,10 +35,10 @@ class SEBasicBlock(nn.Module):
         out += self.shortcut(x)
         return F.relu(out)
 
-class SEResNet(nn.Module):
+class seresnet(nn.Module):
     def __init__(self, block, num_blocks, num_c=10):
         super().__init__()
-        self.in_planes = 64
+        self.inpl = 64
 
         self.conv1 = nn.Conv2d(3, 64, 3, 1, 1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
@@ -49,12 +49,12 @@ class SEResNet(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         self.linear = nn.Linear(512*block.exp, num_c)
 
-    def _make_layer(self, block, planes, num_blocks, stride):
+    def _make_layer(self, block, pl, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
         for stride in strides:
-            layers.append(block(self.in_planes, planes, stride))
-            self.in_planes = planes * block.exp
+            layers.append(block(self.inpl, pl, stride))
+            self.inpl = pl * block.exp
         return nn.Sequential(*layers)
 
     def forward(self, x):
@@ -68,4 +68,4 @@ class SEResNet(nn.Module):
         return self.linear(out)
 
 def seresnet18():
-    return SEResNet(SEBasicBlock, [2,2,2,2])
+    return seresnet(sebasicblock, [2,2,2,2])
