@@ -16,11 +16,10 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = seresnet18().to(device)
 
-    criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.1,momentum=0.9, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer,milestones=[100, 150], gamma=0.1)
 
-    for epoch in range(200):
+    for epoch in range(100):
         model.train()
         running_loss = 0.0
         for inputs, targets in trainloader:
